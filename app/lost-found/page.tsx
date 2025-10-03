@@ -261,7 +261,7 @@ export default function LostFoundPage() {
                     <div className="pt-3 border-t border-border space-y-2">
                       <p className="text-sm font-medium text-foreground">Contact: {pet.contact}</p>
                       <div className="flex gap-2">
-                        <Button size="sm" className="flex-1 rounded-full bg-primary hover:bg-primary/90 text-surface">
+                        <Button size="sm" className="flex-1 rounded-full bg-primary hover:bg-primary/90 text-white">
                           <Phone className="w-3 h-3 mr-1" />
                           Call
                         </Button>
@@ -329,7 +329,7 @@ export default function LostFoundPage() {
                     <div className="pt-3 border-t border-border space-y-2">
                       <p className="text-sm font-medium text-foreground">Contact: {pet.contact}</p>
                       <div className="flex gap-2">
-                        <Button size="sm" className="flex-1 rounded-full bg-primary hover:bg-primary/90 text-surface">
+                        <Button size="sm" className="flex-1 rounded-full bg-primary hover:bg-primary/90 text-white">
                           <Phone className="w-3 h-3 mr-1" />
                           Call
                         </Button>

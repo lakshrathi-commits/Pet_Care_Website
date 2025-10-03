@@ -184,7 +184,7 @@ export default function HealthPage() {
           <TabsContent value="vaccinations" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-foreground">Vaccination Records</h2>
-              <Button className="rounded-full bg-primary hover:bg-primary/90 text-surface">
+              <Button className="rounded-full bg-primary hover:bg-primary/90 text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Vaccination
               </Button>

@@ -79,7 +79,7 @@ export function Navigation() {
             <Button variant="outline" size="sm" className="rounded-full bg-transparent">
               Sign In
             </Button>
-            <Button size="sm" className="rounded-full bg-primary hover:bg-primary/90 text-surface">
+            <Button size="sm" className="rounded-full bg-primary hover:bg-primary/90 text-white">
               Get Started
             </Button>
           </div>
@@ -122,7 +122,7 @@ export function Navigation() {
               <Button variant="outline" className="w-full rounded-full bg-transparent">
                 Sign In
               </Button>
-              <Button className="w-full rounded-full bg-primary hover:bg-primary/90 text-surface">Get Started</Button>
+              <Button className="w-full rounded-full bg-primary hover:bg-primary/90 text-white">Get Started</Button>
             </div>
           </div>
         </div>

@@ -65,7 +65,7 @@ export default function CommunityPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-foreground">Recent Discussions</h2>
-              <Button className="rounded-full bg-primary hover:bg-primary/90 text-surface">
+              <Button className="rounded-full bg-primary hover:bg-primary/90 text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 New Post
               </Button>

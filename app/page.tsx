@@ -139,15 +139,15 @@ export default function HomePage() {
                     placeholder="Search for pets, products, services..."
                     className="rounded-full border-border bg-surface"
                   />
-                  <Button size="icon" className="rounded-full bg-primary hover:bg-primary/90 text-surface shrink-0">
+                  <Button size="icon" className="rounded-full bg-primary hover:bg-primary/90 text-white shrink-0">
                     <Search className="w-5 h-5" />
                   </Button>
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <Button size="lg" className="rounded-full bg-primary hover:bg-primary/90 text-surface" asChild>
-                  <Link href="/adoption">
+                <Button size="lg" className="rounded-full bg-primary hover:bg-primary/90 text-white" asChild>
+                  <Link href="/adoption" className="text-white">
                     Adopt a Pet
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Link>
@@ -302,8 +302,8 @@ export default function HomePage() {
                 Join thousands of happy pet owners who trust PawCare for all their pet needs
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                <Button size="lg" className="rounded-full bg-primary hover:bg-primary/90 text-surface" asChild>
-                  <Link href="/adoption">
+                <Button size="lg" className="rounded-full bg-primary hover:bg-primary/90 text-white" asChild>
+                  <Link href="/adoption" className="text-white">
                     Start Adopting
                     <Heart className="w-4 h-4 ml-2" />
                   </Link>

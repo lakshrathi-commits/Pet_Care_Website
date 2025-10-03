@@ -315,7 +315,7 @@ export default function AdoptionPage() {
                     </div>
 
                     <div className="flex gap-2 pt-2">
-                      <Button asChild className="flex-1 rounded-full bg-primary hover:bg-primary/90 text-surface">
+                      <Button asChild className="flex-1 rounded-full bg-primary hover:bg-primary/90 text-white">
                         <Link href={`/adoption/${pet.id}`}>View Details</Link>
                       </Button>
                     </div>

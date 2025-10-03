@@ -75,8 +75,8 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-roboto-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -121,5 +121,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    color: var(--foreground);
+    background-color: var(--background);
   }
 }
