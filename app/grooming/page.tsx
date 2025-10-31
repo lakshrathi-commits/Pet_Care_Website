@@ -4,56 +4,59 @@ import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
-import { Scissors, Clock, DollarSign, Star, Check, CalendarIcon } from "lucide-react"
+import { Scissors, Clock, DollarSign, Star, Check, CalendarIcon, Mail } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
+import { db } from "@/lib/firebase"
+import { collection, addDoc } from "firebase/firestore"
 
 const services = [
   {
     id: 1,
     name: "Basic Bath & Brush",
     duration: "1 hour",
-    price: 45,
+    price: 3599,
     description: "Bath, blow dry, brush out, nail trim, and ear cleaning",
-    image: "/dog-bath-service.jpg",
+    image: "https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=500",
   },
   {
     id: 2,
     name: "Full Grooming Package",
     duration: "2 hours",
-    price: 85,
+    price: 6799,
     description: "Complete grooming with haircut, styling, bath, and nail care",
-    image: "/full-grooming-service.jpg",
+    image: "https://images.unsplash.com/photo-1548681528-6a5c45b66b42?w=500",
   },
   {
     id: 3,
     name: "Cat Grooming Special",
     duration: "1.5 hours",
-    price: 65,
+    price: 5199,
     description: "Gentle grooming for cats including bath, brush, and nail trim",
-    image: "/cat-grooming-service.jpg",
+    image: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500",
   },
   {
     id: 4,
     name: "Nail Trim & Paw Care",
     duration: "30 minutes",
-    price: 25,
+    price: 1999,
     description: "Nail trimming and paw pad care",
-    image: "/nail-trim-service.jpg",
+    image: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=500",
   },
   {
     id: 5,
     name: "Teeth Cleaning",
     duration: "45 minutes",
-    price: 55,
+    price: 4399,
     description: "Professional dental cleaning and breath freshening",
-    image: "/teeth-cleaning-service.jpg",
+    image: "https://images.unsplash.com/photo-1601758260447-45c2be8b44b3?w=500",
   },
   {
     id: 6,
     name: "De-shedding Treatment",
     duration: "1 hour",
-    price: 60,
+    price: 4799,
     description: "Special treatment to reduce shedding and promote healthy coat",
-    image: "/deshedding-service.jpg",
+    image: "https://images.unsplash.com/photo-1517849845537-4d257902454a?w=500",
   },
 ]
 
@@ -64,7 +67,7 @@ const groomers = [
     rating: 4.9,
     reviews: 234,
     specialty: "Dogs & Cats",
-    image: "/groomer-sarah.jpg",
+    image: "https://images.unsplash.com/photo-1494790108755-2616b332b2e2?w=500",
   },
   {
     id: 2,
@@ -72,7 +75,7 @@ const groomers = [
     rating: 4.8,
     reviews: 189,
     specialty: "Large Breeds",
-    image: "/groomer-mike.jpg",
+    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500",
   },
   {
     id: 3,
@@ -80,31 +83,128 @@ const groomers = [
     rating: 5.0,
     reviews: 156,
     specialty: "Cats",
-    image: "/groomer-emily.jpg",
+    image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500",
   },
 ]
 
 const timeSlots = ["9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM"]
 
 export default function GroomingPage() {
+  const { user } = useAuth()
   const [selectedService, setSelectedService] = useState<number | null>(null)
   const [selectedGroomer, setSelectedGroomer] = useState<number | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [step, setStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [bookingId, setBookingId] = useState('')
 
   const selectedServiceData = services.find((s) => s.id === selectedService)
   const selectedGroomerData = groomers.find((g) => g.id === selectedGroomer)
 
-  const handleBooking = () => {
-    // In a real app, this would submit to an API
-    alert("Booking confirmed! You'll receive a confirmation email shortly.")
-    // Reset form
-    setSelectedService(null)
-    setSelectedGroomer(null)
-    setSelectedDate(new Date())
-    setSelectedTime(null)
-    setStep(1)
+  const handleBooking = async () => {
+    if (!user || !selectedServiceData || !selectedGroomerData || !selectedDate || !selectedTime) {
+      alert("Please complete all booking details and sign in to continue.")
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Save booking to Firestore
+      const bookingDoc = await addDoc(collection(db, 'groomingBookings'), {
+        userId: user.uid,
+        userEmail: user.email,
+        userName: user.displayName || 'Guest',
+        service: {
+          id: selectedServiceData.id,
+          name: selectedServiceData.name,
+          price: selectedServiceData.price,
+          duration: selectedServiceData.duration
+        },
+        groomer: {
+          id: selectedGroomerData.id,
+          name: selectedGroomerData.name,
+          specialty: selectedGroomerData.specialty
+        },
+        date: selectedDate.toISOString().split('T')[0],
+        time: selectedTime,
+        status: 'confirmed',
+        createdAt: new Date().toISOString()
+      })
+
+      setBookingId(bookingDoc.id)
+      
+      // Send confirmation email (simulated - in production, use a cloud function or email service)
+      await sendConfirmationEmail({
+        email: user.email!,
+        name: user.displayName || 'Guest',
+        bookingId: bookingDoc.id,
+        service: selectedServiceData.name,
+        groomer: selectedGroomerData.name,
+        date: selectedDate.toISOString().split('T')[0],
+        time: selectedTime,
+        price: selectedServiceData.price
+      })
+
+      // Show confirmation
+      setShowConfirmation(true)
+      
+      // Reset form after a delay
+      setTimeout(() => {
+        setSelectedService(null)
+        setSelectedGroomer(null)
+        setSelectedDate(new Date())
+        setSelectedTime(null)
+        setStep(1)
+        setShowConfirmation(false)
+      }, 5000)
+    } catch (error) {
+      console.error('Error creating booking:', error)
+      alert('Failed to create booking. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const sendConfirmationEmail = async (data: {
+    email: string
+    name: string
+    bookingId: string
+    service: string
+    groomer: string
+    date: string
+    time: string
+    price: number
+  }) => {
+    // In production, use a service like SendGrid, AWS SES, or Firebase Cloud Functions
+    // For now, we'll log to console and show a success message
+    console.log('📧 Confirmation email sent to:', data.email)
+    console.log('Booking details:', {
+      ...data,
+      price: `₹${(data.price / 100).toFixed(2)}`
+    })
+    
+    // Simulated email content
+    const emailContent = `
+      Dear ${data.name},
+      
+      Your grooming appointment has been confirmed!
+      
+      Booking ID: ${data.bookingId}
+      Service: ${data.service}
+      Groomer: ${data.groomer}
+      Date: ${new Date(data.date).toLocaleDateString()}
+      Time: ${data.time}
+      Total: ₹${(data.price / 100).toFixed(2)}
+      
+      We look forward to seeing you!
+      
+      Best regards,
+      PawCare Team
+    `
+    
+    return Promise.resolve(emailContent)
   }
 
   return (
@@ -187,8 +287,7 @@ export default function GroomingPage() {
                         <span>{service.duration}</span>
                       </div>
                       <div className="flex items-center gap-1 text-lg font-bold text-primary">
-                        <DollarSign className="w-5 h-5" />
-                        <span>{service.price}</span>
+                        <span>₹{service.price.toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -348,7 +447,7 @@ export default function GroomingPage() {
                                 <Clock className="w-4 h-4" />
                                 {selectedServiceData?.duration}
                               </span>
-                              <span className="text-sm font-semibold text-primary">${selectedServiceData?.price}</span>
+                              <span className="text-sm font-semibold text-primary">₹{selectedServiceData?.price.toLocaleString('en-IN')}</span>
                             </div>
                           </div>
                         </div>
@@ -400,36 +499,96 @@ export default function GroomingPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-foreground-muted">Service Fee</span>
-                      <span className="font-medium text-foreground">${selectedServiceData?.price}</span>
+                      <span className="font-medium text-foreground">₹{selectedServiceData?.price.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-foreground-muted">Tax</span>
                       <span className="font-medium text-foreground">
-                        ${((selectedServiceData?.price || 0) * 0.08).toFixed(2)}
+                        ₹{((selectedServiceData?.price || 0) * 0.18).toLocaleString('en-IN')}
                       </span>
                     </div>
                     <div className="border-t border-border pt-3">
                       <div className="flex justify-between">
                         <span className="font-semibold text-foreground">Total</span>
                         <span className="text-2xl font-bold text-primary">
-                          ${((selectedServiceData?.price || 0) * 1.08).toFixed(2)}
+                          ₹{((selectedServiceData?.price || 0) * 1.18).toLocaleString('en-IN')}
                         </span>
                       </div>
                     </div>
                   </div>
                   <Button
                     size="lg"
-                    className="w-full rounded-full bg-primary hover:bg-primary/90 text-surface"
+                    className="w-full rounded-full bg-primary hover:bg-primary/90 text-white"
                     onClick={handleBooking}
+                    disabled={loading || !user}
                   >
-                    Confirm Booking
+                    {loading ? 'Processing...' : !user ? 'Sign In to Book' : 'Confirm Booking'}
                   </Button>
+                  {!user && (
+                    <p className="text-center text-sm text-foreground-muted mt-2">
+                      Please sign in to complete your booking
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </div>
         )}
       </div>
+
+      {/* Booking Confirmation Modal */}
+      {showConfirmation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-8 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/20 mb-4">
+                <Check className="w-8 h-8 text-success" />
+              </div>
+              <h2 className="text-2xl font-bold text-foreground mb-2">Booking Confirmed!</h2>
+              <p className="text-foreground-muted mb-4">
+                Your grooming appointment has been successfully booked.
+              </p>
+              
+              <div className="bg-muted rounded-lg p-4 mb-6 text-left space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="w-4 h-4 text-primary" />
+                  <span className="text-foreground-muted">Booking ID:</span>
+                  <span className="font-mono text-foreground">{bookingId.slice(0, 8)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <CalendarIcon className="w-4 h-4 text-primary" />
+                  <span className="text-foreground-muted">Date:</span>
+                  <span className="text-foreground">{selectedDate?.toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <span className="text-foreground-muted">Time:</span>
+                  <span className="text-foreground">{selectedTime}</span>
+                </div>
+              </div>
+
+              <div className="bg-primary/10 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-primary mt-0.5" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-foreground">Confirmation Email Sent</p>
+                    <p className="text-xs text-foreground-muted mt-1">
+                      Check your inbox at <span className="font-medium">{user?.email}</span> for booking details.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                className="w-full rounded-full bg-primary hover:bg-primary/90 text-white"
+                onClick={() => setShowConfirmation(false)}
+              >
+                Done
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

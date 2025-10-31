@@ -1,110 +1,127 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, MapPin, Calendar, Phone, Mail, AlertCircle, CheckCircle, Plus } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore"
+import { Search, MapPin, Calendar, Phone, Mail, AlertCircle, CheckCircle, Plus, X } from "lucide-react"
 
-const lostPets = [
-  {
-    id: 1,
-    name: "Buddy",
-    type: "Dog",
-    breed: "Labrador Retriever",
-    color: "Yellow",
-    age: "3 years",
-    lastSeen: "Downtown Park, Main Street",
-    date: "2025-01-28",
-    image: "/lost-labrador.jpg",
-    description: "Friendly yellow lab, wearing a blue collar with tags. Responds to 'Buddy'.",
-    contact: "John Smith",
-    phone: "(555) 123-4567",
-    status: "lost",
-  },
-  {
-    id: 2,
-    name: "Whiskers",
-    type: "Cat",
-    breed: "Tabby",
-    color: "Orange and White",
-    age: "2 years",
-    lastSeen: "Oak Avenue, near the library",
-    date: "2025-01-27",
-    image: "/lost-tabby-cat.jpg",
-    description: "Orange tabby with white paws, very shy. Missing since Tuesday evening.",
-    contact: "Mary Johnson",
-    phone: "(555) 234-5678",
-    status: "lost",
-  },
-  {
-    id: 3,
-    name: "Max",
-    type: "Dog",
-    breed: "German Shepherd",
-    color: "Black and Tan",
-    age: "5 years",
-    lastSeen: "Riverside Trail",
-    date: "2025-01-26",
-    image: "/lost-german-shepherd.jpg",
-    description: "Large German Shepherd, microchipped. Last seen on hiking trail.",
-    contact: "Robert Davis",
-    phone: "(555) 345-6789",
-    status: "lost",
-  },
-]
-
-const foundPets = [
-  {
-    id: 1,
-    type: "Dog",
-    breed: "Mixed Breed",
-    color: "Brown",
-    foundLocation: "Central Park",
-    date: "2025-01-29",
-    image: "/found-mixed-dog.jpg",
-    description: "Small brown dog found wandering, no collar or tags. Very friendly.",
-    contact: "Sarah Wilson",
-    phone: "(555) 456-7890",
-    status: "found",
-  },
-  {
-    id: 2,
-    type: "Cat",
-    breed: "Siamese",
-    color: "Cream and Brown",
-    foundLocation: "Elm Street",
-    date: "2025-01-28",
-    image: "/found-siamese-cat.jpg",
-    description: "Siamese cat found in backyard, appears well-cared for.",
-    contact: "Mike Brown",
-    phone: "(555) 567-8901",
-    status: "found",
-  },
-]
+interface LostFoundPost {
+  id: string
+  name?: string
+  type: string
+  breed: string
+  color: string
+  age?: string
+  location: string
+  date: string
+  image: string
+  description: string
+  contact: string
+  phone: string
+  email?: string
+  status: 'lost' | 'found'
+  userId: string
+  createdAt: string
+}
 
 export default function LostFoundPage() {
+  const { user } = useAuth()
+  const [posts, setPosts] = useState<LostFoundPost[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState("all")
-
-  const filteredLost = lostPets.filter((pet) => {
-    const matchesSearch =
-      pet.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pet.breed.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pet.lastSeen.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = selectedType === "all" || pet.type.toLowerCase() === selectedType
-    return matchesSearch && matchesType
+  const [showNewPostForm, setShowNewPostForm] = useState(false)
+  const [activeTab, setActiveTab] = useState("lost")
+  const [loading, setLoading] = useState(false)
+  
+  // Form state for new post
+  const [newPost, setNewPost] = useState({
+    name: "",
+    type: "",
+    breed: "",
+    color: "",
+    age: "",
+    location: "",
+    description: "",
+    contact: "",
+    phone: "",
+    email: "",
+    image: "",
+    status: 'lost' as 'lost' | 'found'
   })
 
-  const filteredFound = foundPets.filter((pet) => {
+  // Load posts from Firebase
+  useEffect(() => {
+    const postsQuery = query(collection(db, 'lostFoundPosts'), orderBy('createdAt', 'desc'))
+    const unsubscribe = onSnapshot(postsQuery, (snapshot) => {
+      const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LostFoundPost))
+      setPosts(postsData)
+    })
+
+    return unsubscribe
+  }, [])
+
+  const addPost = async () => {
+    if (!user || !newPost.type || !newPost.breed || !newPost.location) return
+    
+    setLoading(true)
+    try {
+      await addDoc(collection(db, 'lostFoundPosts'), {
+        ...newPost,
+        userId: user.uid,
+        createdAt: new Date().toISOString(),
+        date: new Date().toISOString().split('T')[0]
+      })
+      
+      setNewPost({
+        name: "",
+        type: "",
+        breed: "",
+        color: "",
+        age: "",
+        location: "",
+        description: "",
+        contact: "",
+        phone: "",
+        email: "",
+        image: "",
+        status: 'lost'
+      })
+      setShowNewPostForm(false)
+    } catch (error) {
+      console.error('Error adding post:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredPosts = posts.filter((post) => {
     const matchesSearch =
-      pet.breed.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pet.foundLocation.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = selectedType === "all" || pet.type.toLowerCase() === selectedType
-    return matchesSearch && matchesType
+      (post.name?.toLowerCase().includes(searchQuery.toLowerCase()) || '') ||
+      post.breed.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.location.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesType = selectedType === "all" || post.type.toLowerCase() === selectedType
+    const matchesStatus = post.status === activeTab
+    return matchesSearch && matchesType && matchesStatus
   })
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-secondary/10 via-background to-accent/10 flex items-center justify-center">
+        <Card className="p-8 text-center">
+          <CardContent>
+            <h2 className="text-2xl font-bold text-foreground mb-4">Sign In Required</h2>
+            <p className="text-foreground-muted">Please sign in to access the Lost & Found section.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-secondary/10 via-background to-accent/10">
@@ -176,7 +193,13 @@ export default function LostFoundPage() {
                   <p className="text-sm text-foreground-muted mb-4">
                     Report your missing pet to help the community assist in finding them
                   </p>
-                  <Button className="rounded-full bg-destructive hover:bg-destructive/90 text-surface">
+                  <Button 
+                    className="rounded-full bg-destructive hover:bg-destructive/90 text-surface"
+                    onClick={() => {
+                      setNewPost({...newPost, status: 'lost'})
+                      setShowNewPostForm(true)
+                    }}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Report Lost Pet
                   </Button>
@@ -196,7 +219,13 @@ export default function LostFoundPage() {
                   <p className="text-sm text-foreground-muted mb-4">
                     Help reunite a found pet with their owner by posting here
                   </p>
-                  <Button className="rounded-full bg-success hover:bg-success/90 text-surface">
+                  <Button 
+                    className="rounded-full bg-success hover:bg-success/90 text-surface"
+                    onClick={() => {
+                      setNewPost({...newPost, status: 'found'})
+                      setShowNewPostForm(true)
+                    }}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Report Found Pet
                   </Button>
@@ -207,28 +236,32 @@ export default function LostFoundPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="lost" className="space-y-8">
+        <Tabs 
+          defaultValue="lost" 
+          className="space-y-8"
+          onValueChange={(value) => setActiveTab(value as 'lost' | 'found')}
+        >
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 bg-muted">
             <TabsTrigger value="lost">
               <AlertCircle className="w-4 h-4 mr-2" />
-              Lost Pets ({filteredLost.length})
+              Lost Pets ({posts.filter(p => p.status === 'lost').length})
             </TabsTrigger>
             <TabsTrigger value="found">
               <CheckCircle className="w-4 h-4 mr-2" />
-              Found Pets ({filteredFound.length})
+              Found Pets ({posts.filter(p => p.status === 'found').length})
             </TabsTrigger>
           </TabsList>
 
           {/* Lost Pets Tab */}
           <TabsContent value="lost" className="space-y-6">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredLost.map((pet) => (
-                <Card key={pet.id} className="border-border hover:border-destructive hover:shadow-xl transition-all">
+              {filteredPosts.map((post) => (
+                <Card key={post.id} className="border-border hover:border-destructive hover:shadow-xl transition-all">
                   <div className="relative">
                     <div className="aspect-square relative overflow-hidden">
                       <img
-                        src={pet.image || "/placeholder.svg"}
-                        alt={pet.name}
+                        src={post.image || "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500"}
+                        alt={post.name || 'Pet'}
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -239,27 +272,27 @@ export default function LostFoundPage() {
                   </div>
                   <CardContent className="p-5 space-y-3">
                     <div>
-                      <h3 className="text-xl font-bold text-foreground">{pet.name}</h3>
+                      <h3 className="text-xl font-bold text-foreground">{post.name || 'Unknown'}</h3>
                       <p className="text-sm text-foreground-muted">
-                        {pet.breed} • {pet.color}
+                        {post.breed} • {post.color}
                       </p>
                     </div>
 
-                    <p className="text-sm text-foreground-muted leading-relaxed line-clamp-2">{pet.description}</p>
+                    <p className="text-sm text-foreground-muted leading-relaxed line-clamp-2">{post.description}</p>
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm text-foreground-muted">
                         <MapPin className="w-4 h-4 text-destructive" />
-                        <span className="line-clamp-1">{pet.lastSeen}</span>
+                        <span className="line-clamp-1">{post.location}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-foreground-muted">
                         <Calendar className="w-4 h-4 text-destructive" />
-                        <span>Last seen: {pet.date}</span>
+                        <span>Last seen: {post.date}</span>
                       </div>
                     </div>
 
                     <div className="pt-3 border-t border-border space-y-2">
-                      <p className="text-sm font-medium text-foreground">Contact: {pet.contact}</p>
+                      <p className="text-sm font-medium text-foreground">Contact: {post.contact}</p>
                       <div className="flex gap-2">
                         <Button size="sm" className="flex-1 rounded-full bg-primary hover:bg-primary/90 text-white">
                           <Phone className="w-3 h-3 mr-1" />
@@ -276,7 +309,7 @@ export default function LostFoundPage() {
               ))}
             </div>
 
-            {filteredLost.length === 0 && (
+            {filteredPosts.length === 0 && (
               <div className="text-center py-20">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-4">
                   <Search className="w-10 h-10 text-foreground-muted" />
@@ -290,12 +323,12 @@ export default function LostFoundPage() {
           {/* Found Pets Tab */}
           <TabsContent value="found" className="space-y-6">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredFound.map((pet) => (
-                <Card key={pet.id} className="border-border hover:border-success hover:shadow-xl transition-all">
+              {filteredPosts.map((post) => (
+                <Card key={post.id} className="border-border hover:border-success hover:shadow-xl transition-all">
                   <div className="relative">
                     <div className="aspect-square relative overflow-hidden">
                       <img
-                        src={pet.image || "/placeholder.svg"}
+                        src={post.image || "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500"}
                         alt="Found pet"
                         className="w-full h-full object-cover"
                       />
@@ -307,27 +340,27 @@ export default function LostFoundPage() {
                   </div>
                   <CardContent className="p-5 space-y-3">
                     <div>
-                      <h3 className="text-xl font-bold text-foreground">{pet.type}</h3>
+                      <h3 className="text-xl font-bold text-foreground">{post.type}</h3>
                       <p className="text-sm text-foreground-muted">
-                        {pet.breed} • {pet.color}
+                        {post.breed} • {post.color}
                       </p>
                     </div>
 
-                    <p className="text-sm text-foreground-muted leading-relaxed line-clamp-2">{pet.description}</p>
+                    <p className="text-sm text-foreground-muted leading-relaxed line-clamp-2">{post.description}</p>
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm text-foreground-muted">
                         <MapPin className="w-4 h-4 text-success" />
-                        <span className="line-clamp-1">{pet.foundLocation}</span>
+                        <span className="line-clamp-1">{post.location}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-foreground-muted">
                         <Calendar className="w-4 h-4 text-success" />
-                        <span>Found on: {pet.date}</span>
+                        <span>Found on: {post.date}</span>
                       </div>
                     </div>
 
                     <div className="pt-3 border-t border-border space-y-2">
-                      <p className="text-sm font-medium text-foreground">Contact: {pet.contact}</p>
+                      <p className="text-sm font-medium text-foreground">Contact: {post.contact}</p>
                       <div className="flex gap-2">
                         <Button size="sm" className="flex-1 rounded-full bg-primary hover:bg-primary/90 text-white">
                           <Phone className="w-3 h-3 mr-1" />
@@ -344,7 +377,7 @@ export default function LostFoundPage() {
               ))}
             </div>
 
-            {filteredFound.length === 0 && (
+            {filteredPosts.length === 0 && (
               <div className="text-center py-20">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-4">
                   <Search className="w-10 h-10 text-foreground-muted" />
@@ -387,6 +420,148 @@ export default function LostFoundPage() {
             ))}
           </div>
         </section>
+
+        {/* New Post Modal */}
+        {showNewPostForm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-2xl max-h-[90vh] overflow-hidden">
+              <CardContent className="p-0">
+                <div className="flex justify-between items-center p-6 border-b border-border">
+                  <h2 className="text-2xl font-bold text-foreground">
+                    Report {newPost.status === 'lost' ? 'Lost' : 'Found'} Pet
+                  </h2>
+                  <button
+                    onClick={() => setShowNewPostForm(false)}
+                    className="text-foreground-muted hover:text-foreground"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-4">
+                  {newPost.status === 'lost' && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Pet Name</label>
+                      <Input
+                        value={newPost.name}
+                        onChange={(e) => setNewPost({...newPost, name: e.target.value})}
+                        placeholder="Enter pet name"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Pet Type *</label>
+                      <Input
+                        value={newPost.type}
+                        onChange={(e) => setNewPost({...newPost, type: e.target.value})}
+                        placeholder="Dog, Cat, Bird, etc."
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Breed *</label>
+                      <Input
+                        value={newPost.breed}
+                        onChange={(e) => setNewPost({...newPost, breed: e.target.value})}
+                        placeholder="Enter breed"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Color</label>
+                      <Input
+                        value={newPost.color}
+                        onChange={(e) => setNewPost({...newPost, color: e.target.value})}
+                        placeholder="Primary color"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Age</label>
+                      <Input
+                        value={newPost.age}
+                        onChange={(e) => setNewPost({...newPost, age: e.target.value})}
+                        placeholder="e.g., 2 years"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {newPost.status === 'lost' ? 'Last Seen Location *' : 'Found Location *'}
+                    </label>
+                    <Input
+                      value={newPost.location}
+                      onChange={(e) => setNewPost({...newPost, location: e.target.value})}
+                      placeholder="Enter location details"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+                    <textarea
+                      value={newPost.description}
+                      onChange={(e) => setNewPost({...newPost, description: e.target.value})}
+                      placeholder="Describe the pet, behavior, and circumstances..."
+                      className="w-full p-3 rounded-lg border border-border bg-background resize-none"
+                      rows={4}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Contact Name</label>
+                      <Input
+                        value={newPost.contact}
+                        onChange={(e) => setNewPost({...newPost, contact: e.target.value})}
+                        placeholder="Your name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Phone Number</label>
+                      <Input
+                        value={newPost.phone}
+                        onChange={(e) => setNewPost({...newPost, phone: e.target.value})}
+                        placeholder="Your phone number"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">Image URL (optional)</label>
+                    <Input
+                      value={newPost.image}
+                      onChange={(e) => setNewPost({...newPost, image: e.target.value})}
+                      placeholder="Enter image URL"
+                    />
+                  </div>
+
+                  <div className="flex gap-4 pt-4">
+                    <Button 
+                      onClick={addPost}
+                      className="flex-1 bg-primary hover:bg-primary/90 text-white"
+                      disabled={loading || !newPost.type || !newPost.breed || !newPost.location}
+                    >
+                      {loading ? 'Posting...' : `Post ${newPost.status === 'lost' ? 'Lost' : 'Found'} Pet`}
+                    </Button>
+                    <Button 
+                      onClick={() => setShowNewPostForm(false)}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )

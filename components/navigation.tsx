@@ -13,14 +13,21 @@ import {
   SearchIcon,
   MessageCircle,
   Phone,
+  User,
+  LogOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/cart-context"
+import { useAuth } from "@/lib/auth-context"
 import { Badge } from "@/components/ui/badge"
+import { AuthModal } from "@/components/auth-modal"
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const { totalItems } = useCart()
+  const { user, logout } = useAuth()
 
   const navItems = [
     { name: "Home", href: "/", icon: Heart },
@@ -35,7 +42,8 @@ export function Navigation() {
   ]
 
   return (
-    <nav className="sticky top-0 z-50 bg-surface/95 backdrop-blur-sm border-b border-border shadow-sm">
+    <>
+    <nav className="sticky top-0 z-40 bg-surface/95 backdrop-blur-sm border-b border-border shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -76,12 +84,47 @@ export function Navigation() {
                 )}
               </Button>
             </Link>
-            <Button variant="outline" size="sm" className="rounded-full bg-transparent">
-              Sign In
-            </Button>
-            <Button size="sm" className="rounded-full bg-primary hover:bg-primary/90 text-white">
-              Get Started
-            </Button>
+            
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-foreground-muted">
+                  Hello, {user.displayName || 'User'}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-full bg-transparent"
+                  onClick={logout}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-full bg-transparent"
+                  onClick={() => {
+                    setAuthMode('signin')
+                    setAuthModalOpen(true)
+                  }}
+                >
+                  Sign In
+                </Button>
+                <Button 
+                  size="sm" 
+                  className="rounded-full bg-primary hover:bg-primary/90 text-white"
+                  onClick={() => {
+                    setAuthMode('signup')
+                    setAuthModalOpen(true)
+                  }}
+                >
+                  Get Started
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -119,14 +162,53 @@ export function Navigation() {
                   Cart {totalItems > 0 && `(${totalItems})`}
                 </Button>
               </Link>
-              <Button variant="outline" className="w-full rounded-full bg-transparent">
-                Sign In
-              </Button>
-              <Button className="w-full rounded-full bg-primary hover:bg-primary/90 text-white">Get Started</Button>
+              {user ? (
+                <Button 
+                  variant="outline" 
+                  className="w-full rounded-full bg-transparent"
+                  onClick={logout}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              ) : (
+                <>
+                  <Button 
+                    variant="outline" 
+                    className="w-full rounded-full bg-transparent"
+                    onClick={() => {
+                      setAuthMode('signin')
+                      setAuthModalOpen(true)
+                      setIsOpen(false)
+                    }}
+                  >
+                    Sign In
+                  </Button>
+                  <Button 
+                    className="w-full rounded-full bg-primary hover:bg-primary/90 text-white"
+                    onClick={() => {
+                      setAuthMode('signup')
+                      setAuthModalOpen(true)
+                      setIsOpen(false)
+                    }}
+                  >
+                    Get Started
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
+
     </nav>
+
+    <AuthModal 
+      isOpen={authModalOpen} 
+      onClose={() => setAuthModalOpen(false)}
+      mode={authMode}
+      onToggleMode={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+    />
+    </>
   )
 }

@@ -1,48 +1,131 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { MessageCircle, ThumbsUp, Eye, Plus, TrendingUp } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc, increment } from "firebase/firestore"
+import { MessageCircle, ThumbsUp, Eye, Plus, TrendingUp, X } from "lucide-react"
 
-const posts = [
-  {
-    id: 1,
-    author: "Sarah Johnson",
-    avatar: "/user-avatar-1.jpg",
-    title: "Best dog parks in the city?",
-    content: "Looking for recommendations for dog-friendly parks where my golden retriever can run off-leash...",
-    category: "Discussion",
-    likes: 24,
-    comments: 12,
-    views: 156,
-    time: "2 hours ago",
-  },
-  {
-    id: 2,
-    author: "Mike Chen",
-    avatar: "/user-avatar-2.jpg",
-    title: "My cat won't eat new food",
-    content: "I recently switched my cat's food brand and she refuses to eat it. Any tips on transitioning?",
-    category: "Advice",
-    likes: 18,
-    comments: 8,
-    views: 89,
-    time: "5 hours ago",
-  },
-  {
-    id: 3,
-    author: "Emily Rodriguez",
-    avatar: "/user-avatar-3.jpg",
-    title: "Puppy training success story!",
-    content: "After 3 months of consistent training, my puppy finally mastered all basic commands...",
-    category: "Success Story",
-    likes: 45,
-    comments: 15,
-    views: 234,
-    time: "1 day ago",
-  },
-]
+interface CommunityPost {
+  id: string
+  author: string
+  authorId: string
+  avatar?: string
+  title: string
+  content: string
+  category: string
+  likes: number
+  comments: number
+  views: number
+  createdAt: string
+  likedBy?: string[]
+}
 
 export default function CommunityPage() {
+  const { user } = useAuth()
+  const [posts, setPosts] = useState<CommunityPost[]>([])
+  const [showNewPostForm, setShowNewPostForm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  
+  // Form state for new post
+  const [newPost, setNewPost] = useState({
+    title: "",
+    content: "",
+    category: "Discussion"
+  })
+
+  // Load posts from Firebase
+  useEffect(() => {
+    const postsQuery = query(collection(db, 'communityPosts'), orderBy('createdAt', 'desc'))
+    const unsubscribe = onSnapshot(postsQuery, (snapshot) => {
+      const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityPost))
+      setPosts(postsData)
+    })
+
+    return unsubscribe
+  }, [])
+
+  const addPost = async () => {
+    if (!user || !newPost.title || !newPost.content) return
+    
+    setLoading(true)
+    try {
+      await addDoc(collection(db, 'communityPosts'), {
+        ...newPost,
+        author: user.displayName || 'Anonymous',
+        authorId: user.uid,
+        avatar: user.photoURL || '',
+        likes: 0,
+        comments: 0,
+        views: 0,
+        createdAt: new Date().toISOString(),
+        likedBy: []
+      })
+      
+      setNewPost({
+        title: "",
+        content: "",
+        category: "Discussion"
+      })
+      setShowNewPostForm(false)
+    } catch (error) {
+      console.error('Error adding post:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const likePost = async (postId: string) => {
+    if (!user) return
+    
+    try {
+      const postRef = doc(db, 'communityPosts', postId)
+      await updateDoc(postRef, {
+        likes: increment(1)
+      })
+    } catch (error) {
+      console.error('Error liking post:', error)
+    }
+  }
+
+  const incrementView = async (postId: string) => {
+    try {
+      const postRef = doc(db, 'communityPosts', postId)
+      await updateDoc(postRef, {
+        views: increment(1)
+      })
+    } catch (error) {
+      console.error('Error incrementing view:', error)
+    }
+  }
+
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+    
+    if (diffInMinutes < 1) return 'just now'
+    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`
+    return `${Math.floor(diffInMinutes / 1440)} days ago`
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-secondary/10 via-background to-accent/10 flex items-center justify-center">
+        <Card className="p-8 text-center">
+          <CardContent>
+            <h2 className="text-2xl font-bold text-foreground mb-4">Sign In Required</h2>
+            <p className="text-foreground-muted">Please sign in to access the community forum.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-secondary/10 via-background to-accent/10">
       {/* Hero Section */}
@@ -65,7 +148,10 @@ export default function CommunityPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-foreground">Recent Discussions</h2>
-              <Button className="rounded-full bg-primary hover:bg-primary/90 text-white">
+              <Button 
+                className="rounded-full bg-primary hover:bg-primary/90 text-white"
+                onClick={() => setShowNewPostForm(true)}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 New Post
               </Button>
@@ -85,7 +171,7 @@ export default function CommunityPage() {
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <h3 className="font-semibold text-foreground">{post.author}</h3>
-                            <p className="text-sm text-foreground-muted">{post.time}</p>
+                            <p className="text-sm text-foreground-muted">{getTimeAgo(post.createdAt)}</p>
                           </div>
                           <Badge variant="outline">{post.category}</Badge>
                         </div>
@@ -95,7 +181,10 @@ export default function CommunityPage() {
                     </div>
 
                     <div className="flex items-center gap-6 pt-4 border-t border-border">
-                      <button className="flex items-center gap-2 text-sm text-foreground-muted hover:text-primary transition-colors">
+                      <button 
+                        className="flex items-center gap-2 text-sm text-foreground-muted hover:text-primary transition-colors"
+                        onClick={() => likePost(post.id)}
+                      >
                         <ThumbsUp className="w-4 h-4" />
                         <span>{post.likes}</span>
                       </button>
@@ -103,7 +192,10 @@ export default function CommunityPage() {
                         <MessageCircle className="w-4 h-4" />
                         <span>{post.comments}</span>
                       </button>
-                      <div className="flex items-center gap-2 text-sm text-foreground-muted">
+                      <div 
+                        className="flex items-center gap-2 text-sm text-foreground-muted cursor-pointer"
+                        onClick={() => incrementView(post.id)}
+                      >
                         <Eye className="w-4 h-4" />
                         <span>{post.views}</span>
                       </div>
@@ -150,6 +242,81 @@ export default function CommunityPage() {
             </Card>
           </div>
         </div>
+
+        {/* New Post Modal */}
+        {showNewPostForm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-2xl">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-foreground">Create New Post</h2>
+                  <button
+                    onClick={() => setShowNewPostForm(false)}
+                    className="text-foreground-muted hover:text-foreground"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">Post Title *</label>
+                    <Input
+                      value={newPost.title}
+                      onChange={(e) => setNewPost({...newPost, title: e.target.value})}
+                      placeholder="Enter a descriptive title..."
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">Category</label>
+                    <select
+                      value={newPost.category}
+                      onChange={(e) => setNewPost({...newPost, category: e.target.value})}
+                      className="w-full p-3 rounded-lg border border-border bg-background"
+                    >
+                      <option value="Discussion">Discussion</option>
+                      <option value="Advice">Advice</option>
+                      <option value="Success Story">Success Story</option>
+                      <option value="Question">Question</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">Content *</label>
+                    <textarea
+                      value={newPost.content}
+                      onChange={(e) => setNewPost({...newPost, content: e.target.value})}
+                      placeholder="Share your thoughts, ask questions, or tell your story..."
+                      className="w-full p-3 rounded-lg border border-border bg-background resize-none"
+                      rows={6}
+                      required
+                    />
+                  </div>
+
+                  <div className="flex gap-4 pt-4">
+                    <Button 
+                      onClick={addPost}
+                      className="flex-1 bg-primary hover:bg-primary/90 text-white"
+                      disabled={loading || !newPost.title || !newPost.content}
+                    >
+                      {loading ? 'Posting...' : 'Create Post'}
+                    </Button>
+                    <Button 
+                      onClick={() => setShowNewPostForm(false)}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )
